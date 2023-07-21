@@ -1,9 +1,7 @@
-# bktree
+# BK-tree
 
-Create a project using this template and run following command to replace project name.
+Implementing a Brukhard Keller tree data structure that allows for querying of "close" matches on discrete distances.
 
-```Bash
-find . -type f -exec sed -i "s/bktree/<YOUR PROJECT NAME>/g" {} \;
-```
+## LICENSE
 
-Then [add a license to your project](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/adding-a-license-to-a-repository).
+MIT
