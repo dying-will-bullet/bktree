@@ -55,15 +55,15 @@ pub fn BkTree(comptime T: type, comptime D: anytype) type {
             }
         }
 
-        pub fn insert(self: *Self, val: T) !void {
+        pub fn insert(self: *Self, target: T) !void {
             if (self.root == null) {
-                self.root = Node(T).init(self.allocator, val);
+                self.root = Node(T).init(self.allocator, target);
             } else {
                 // & here
                 var root = &self.root.?;
 
                 while (true) {
-                    const k = try dist_fn(&root.word, &val, self.allocator);
+                    const k = try dist_fn(&root.word, &target, self.allocator);
                     if (k == 0) {
                         return;
                     }
@@ -77,7 +77,7 @@ pub fn BkTree(comptime T: type, comptime D: anytype) type {
 
                     if (pos == null) {
                         try root.children.append(.{
-                            k, Node(T).init(self.allocator, val),
+                            k, Node(T).init(self.allocator, target),
                         });
                     } else {
                         root = &root.children.items[pos.?][1];
@@ -86,30 +86,59 @@ pub fn BkTree(comptime T: type, comptime D: anytype) type {
             }
         }
 
-        pub fn find(self: Self, val: T, max_dist: isize) !std.ArrayList(Tuple(&[_]type{ *const T, isize })) {
-            var res = std.ArrayList(Tuple(&[_]type{ *const T, isize })).init(self.allocator);
+        pub fn find(self: *Self, target: T, max_dist: isize) !Iterator(T, D) {
+            return Iterator(T, D).init(&self.root.?, target, max_dist, self.allocator);
+        }
+    };
+}
 
-            if (self.root == null) {
-                return res;
-            }
+pub fn Iterator(comptime T: type, comptime D: anytype) type {
+    return struct {
+        candidates: std.ArrayList(*const Node(T)),
+        target: T,
+        max_dist: isize,
+        allocator: Allocator,
 
-            var candidates = std.ArrayList(*const Node(T)).init(self.allocator);
-            defer candidates.deinit();
-            try candidates.append(&self.root.?);
+        const dist_fn = D.distance;
+        const Self = @This();
 
-            while (candidates.items.len > 0) {
-                const n = candidates.orderedRemove(0);
-                const distance = try dist_fn(&n.word, &val, self.allocator);
-                if (distance <= max_dist) {
-                    try res.append(.{ &n.word, distance });
-                }
+        pub fn init(root: *const Node(T), target: T, max_dist: isize, allocator: Allocator) !Self {
+            var candidates = std.ArrayList(*const Node(T)).init(allocator);
+            try candidates.append(root);
+            return Self{
+                .candidates = candidates,
+                .target = target,
+                .max_dist = max_dist,
+                .allocator = allocator,
+            };
+        }
 
+        pub fn deinit(self: *Self) void {
+            self.candidates.deinit();
+        }
+
+        pub fn next(self: *Self) !?Tuple(&[_]type{ *const T, isize }) {
+            while (self.candidates.items.len > 0) {
+                const n: *const Node(T) = self.candidates.orderedRemove(0);
+                const distance = try dist_fn(&(n.*.word), &self.target, self.allocator);
                 // * here
                 for (n.children.items) |*item| {
-                    if (try std.math.absInt((item[0] - distance)) <= max_dist) {
-                        try candidates.append(&item[1]);
+                    const d = item[0];
+                    if (try std.math.absInt((d - distance)) <= self.max_dist) {
+                        try self.candidates.append(&item[1]);
                     }
                 }
+                if (distance <= self.max_dist) {
+                    return .{ &(n.*.word), distance };
+                }
+            }
+            return null;
+        }
+
+        pub fn collect(self: *Self) !std.ArrayList(Tuple(&[_]type{ *const T, isize })) {
+            var res = std.ArrayList(Tuple(&[_]type{ *const T, isize })).init(self.allocator);
+            while (try self.next()) |*item| {
+                try res.append(item.*);
             }
             return res;
         }
@@ -130,12 +159,12 @@ test "BkTree int hamming distance" {
     defer tree.deinit();
 
     try tree.insertSlice(&[_]i32{ 0, 4, 5, 14, 15 });
-    const res = try tree.find(13, 1);
-    defer res.deinit();
+    var it = try tree.find(13, 1);
+    defer it.deinit();
 
-    try testing.expect(res.items.len == 2);
-    try expectEqual(i32, res.items[0], 5, 1);
-    try expectEqual(i32, res.items[1], 15, 1);
+    try expectEqual(i32, (try it.next()).?, 5, 1);
+    try expectEqual(i32, (try it.next()).?, 15, 1);
+    try testing.expect((try it.next()) == null);
 }
 
 test "BkTree ascii string hamming distance" {
@@ -151,13 +180,14 @@ test "BkTree ascii string hamming distance" {
     };
     try tree.insertSlice(words);
 
-    const res = try tree.find("kathlin", 4);
-    defer res.deinit();
-    try testing.expect(res.items.len == 4);
-    try expectEqual([]const u8, res.items[0], "kathlin", 0);
-    try expectEqual([]const u8, res.items[1], "karolin", 2);
-    try expectEqual([]const u8, res.items[2], "kathrin", 1);
-    try expectEqual([]const u8, res.items[3], "carolin", 3);
+    var it = try tree.find("kathlin", 4);
+    defer it.deinit();
+
+    try expectEqual([]const u8, (try it.next()).?, "kathlin", 0);
+    try expectEqual([]const u8, (try it.next()).?, "karolin", 2);
+    try expectEqual([]const u8, (try it.next()).?, "kathrin", 1);
+    try expectEqual([]const u8, (try it.next()).?, "carolin", 3);
+    try testing.expect((try it.next()) == null);
 }
 
 test "BkTree unicode string hamming distance" {
@@ -171,11 +201,12 @@ test "BkTree unicode string hamming distance" {
     };
     try tree.insertSlice(words);
 
-    const res = try tree.find("蒼い花", 1);
-    defer res.deinit();
-    try testing.expect(res.items.len == 2);
-    try expectEqual([]const u8, res.items[0], "青い花", 1);
-    try expectEqual([]const u8, res.items[1], "白い花", 1);
+    var it = try tree.find("蒼い花", 1);
+    defer it.deinit();
+
+    try expectEqual([]const u8, (try it.next()).?, "青い花", 1);
+    try expectEqual([]const u8, (try it.next()).?, "白い花", 1);
+    try testing.expect((try it.next()) == null);
 }
 
 test "BkTree ascii string levenshtein distance" {
@@ -185,13 +216,13 @@ test "BkTree ascii string levenshtein distance" {
     const words = &[_][]const u8{ "book", "books", "boo", "boon", "cook", "cake", "cape", "cart" };
     try tree.insertSlice(words);
 
-    const res = try tree.find("bo", 2);
-    defer res.deinit();
+    var it = try tree.find("bo", 2);
+    defer it.deinit();
 
-    try testing.expect(res.items.len == 3);
-    try expectEqual([]const u8, res.items[0], "book", 2);
-    try expectEqual([]const u8, res.items[1], "boo", 1);
-    try expectEqual([]const u8, res.items[2], "boon", 2);
+    try expectEqual([]const u8, (try it.next()).?, "book", 2);
+    try expectEqual([]const u8, (try it.next()).?, "boo", 1);
+    try expectEqual([]const u8, (try it.next()).?, "boon", 2);
+    try testing.expect((try it.next()) == null);
 }
 
 test "BkTree unicode string levenshtein distance" {
@@ -206,10 +237,36 @@ test "BkTree unicode string levenshtein distance" {
     };
     try tree.insertSlice(words);
 
-    const res = try tree.find("蒼い花", 1);
+    var it = try tree.find("蒼い花", 1);
+    defer it.deinit();
+
+    try expectEqual([]const u8, (try it.next()).?, "青い花", 1);
+    try expectEqual([]const u8, (try it.next()).?, "白い花", 1);
+    try expectEqual([]const u8, (try it.next()).?, "蒼い", 1);
+    try testing.expect((try it.next()) == null);
+}
+
+test "BkTree collect" {
+    var tree = BkTree([]const u8, HammingDistance([]const u8)).init(testing.allocator);
+    defer tree.deinit();
+
+    const words = &[_][]const u8{
+        "kathlin",
+        "karolin",
+        "kathrin",
+        "c4rorin",
+        "carolin",
+    };
+    try tree.insertSlice(words);
+
+    var it = try tree.find("kathlin", 4);
+    defer it.deinit();
+    const res = try it.collect();
     defer res.deinit();
-    try testing.expect(res.items.len == 3);
-    try expectEqual([]const u8, res.items[0], "青い花", 1);
-    try expectEqual([]const u8, res.items[1], "白い花", 1);
-    try expectEqual([]const u8, res.items[2], "蒼い", 1);
+
+    try testing.expect(res.items.len == 4);
+    try expectEqual([]const u8, res.items[0], "kathlin", 0);
+    try expectEqual([]const u8, res.items[1], "karolin", 2);
+    try expectEqual([]const u8, res.items[2], "kathrin", 1);
+    try expectEqual([]const u8, res.items[3], "carolin", 3);
 }
