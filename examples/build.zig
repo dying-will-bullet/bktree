@@ -4,7 +4,7 @@ const pkg_name = "bktree";
 const pkg_path = "../src/lib.zig";
 
 const examples = .{
-    "default",
+    "spell",
 };
 
 pub fn build(b: *std.build.Builder) void {
