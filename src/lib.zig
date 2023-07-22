@@ -87,7 +87,10 @@ pub fn BkTree(comptime T: type, comptime D: anytype) type {
         }
 
         pub fn find(self: *Self, target: T, max_dist: isize) !Iterator(T, D) {
-            return Iterator(T, D).init(&self.root.?, target, max_dist, self.allocator);
+            if (self.root) |*root| {
+                return Iterator(T, D).init(root, target, max_dist, self.allocator);
+            }
+            return Iterator(T, D).init(null, target, max_dist, self.allocator);
         }
     };
 }
@@ -102,9 +105,11 @@ pub fn Iterator(comptime T: type, comptime D: anytype) type {
         const dist_fn = D.distance;
         const Self = @This();
 
-        pub fn init(root: *const Node(T), target: T, max_dist: isize, allocator: Allocator) !Self {
+        pub fn init(root: ?*const Node(T), target: T, max_dist: isize, allocator: Allocator) !Self {
             var candidates = std.ArrayList(*const Node(T)).init(allocator);
-            try candidates.append(root);
+            if (root != null) {
+                try candidates.append(root.?);
+            }
             return Self{
                 .candidates = candidates,
                 .target = target,
@@ -152,6 +157,16 @@ pub fn Iterator(comptime T: type, comptime D: anytype) type {
 fn expectEqual(comptime T: type, acutal: Tuple(&[_]type{ *const T, isize }), expect_val: T, expect_dist: isize) !void {
     try testing.expectEqual(expect_val, acutal[0].*);
     try testing.expectEqual(expect_dist, acutal[1]);
+}
+
+test "BkTree empty nodes" {
+    var tree = BkTree(i32, HammingDistance(i32)).init(testing.allocator);
+    defer tree.deinit();
+
+    var it = try tree.find(13, 1);
+    defer it.deinit();
+
+    try testing.expect((try it.next()) == null);
 }
 
 test "BkTree int hamming distance" {
