@@ -1,5 +1,10 @@
 .{
     .name = "bktree",
     .version = "0.1.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .deque = .{
+            .url = "https://github.com/Hanaasagi/zig-deque/archive/refs/heads/zig-0.11.tar.gz",
+            .hash = "1220a70e1ff88873207b16993d80a89db6f72f1df8f56f601f2a1f24754c4ec552d0",
+        },
+    },
 }

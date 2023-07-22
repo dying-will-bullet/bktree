@@ -3,6 +3,8 @@ const Tuple = std.meta.Tuple;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 
+const deque = @import("deque");
+
 pub const HammingDistance = @import("distance.zig").HammingDistance;
 pub const LevenshteinDistance = @import("distance.zig").LevenshteinDistance;
 
@@ -97,7 +99,7 @@ pub fn BkTree(comptime T: type, comptime D: anytype) type {
 
 pub fn Iterator(comptime T: type, comptime D: anytype) type {
     return struct {
-        candidates: std.ArrayList(*const Node(T)),
+        candidates: deque.Deque(*const Node(T)),
         target: T,
         max_dist: isize,
         allocator: Allocator,
@@ -106,9 +108,9 @@ pub fn Iterator(comptime T: type, comptime D: anytype) type {
         const Self = @This();
 
         pub fn init(root: ?*const Node(T), target: T, max_dist: isize, allocator: Allocator) !Self {
-            var candidates = std.ArrayList(*const Node(T)).init(allocator);
+            var candidates = try deque.Deque(*const Node(T)).init(allocator);
             if (root != null) {
-                try candidates.append(root.?);
+                try candidates.pushBack(root.?);
             }
             return Self{
                 .candidates = candidates,
@@ -123,14 +125,14 @@ pub fn Iterator(comptime T: type, comptime D: anytype) type {
         }
 
         pub fn next(self: *Self) !?Tuple(&[_]type{ *const T, isize }) {
-            while (self.candidates.items.len > 0) {
-                const n: *const Node(T) = self.candidates.orderedRemove(0);
+            while (self.candidates.len() > 0) {
+                const n: *const Node(T) = self.candidates.popFront().?;
                 const distance = try dist_fn(&(n.*.word), &self.target, self.allocator);
                 // * here
                 for (n.children.items) |*item| {
                     const d = item[0];
                     if (try std.math.absInt((d - distance)) <= self.max_dist) {
-                        try self.candidates.append(&item[1]);
+                        try self.candidates.pushBack(&item[1]);
                     }
                 }
                 if (distance <= self.max_dist) {
