@@ -131,7 +131,7 @@ pub fn Iterator(comptime T: type, comptime D: anytype) type {
                 // * here
                 for (n.children.items) |*item| {
                     const d = item[0];
-                    if (try std.math.absInt((d - distance)) <= self.max_dist) {
+                    if (@abs(d - distance) <= self.max_dist) {
                         try self.candidates.pushBack(&item[1]);
                     }
                 }
