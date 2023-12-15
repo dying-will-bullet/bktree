@@ -4,7 +4,7 @@
     .dependencies = .{
         .deque = .{
             .url = "https://github.com/magurotuna/zig-deque/archive/refs/heads/main.tar.gz",
-            .hash = "1220a70e1ff88873207b16993d80a89db6f72f1df8f56f601f2a1f24754c4ec552d0",
+            .hash = "1220b112add57b807959bd3897c66b0eb145640659cd26b273e5c6de9bf99865c478",
         },
     },
     .paths = .{""},
