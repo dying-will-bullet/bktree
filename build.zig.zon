@@ -3,8 +3,8 @@
     .version = "0.1.0",
     .dependencies = .{
         .deque = .{
-            .url = "https://github.com/magurotuna/zig-deque/archive/refs/heads/main.tar.gz",
-            .hash = "1220b112add57b807959bd3897c66b0eb145640659cd26b273e5c6de9bf99865c478",
+            .url = "https://github.com/Hanaasagi/zig-deque/archive/refs/heads/adapt-nightly-build.tar.gz",
+            .hash = "1220f4f2d9fc9befa929f4c13632c986610f649bfa757f7be7790966a74d26914624",
         },
     },
     .paths = .{""},

@@ -27,7 +27,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    lib.addModule("deque", deque_module);
+    lib.root_module.addImport("deque", deque_module);
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    main_tests.addModule("deque", deque_module);
+    main_tests.root_module.addImport("deque", deque_module);
 
     const run_main_tests = b.addRunArtifact(main_tests);
 
